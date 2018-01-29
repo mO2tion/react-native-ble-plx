@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.ParcelUuid;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.SparseArray;
@@ -42,9 +43,11 @@ import com.polidea.rxandroidble.RxBleClient;
 import com.polidea.rxandroidble.RxBleConnection;
 import com.polidea.rxandroidble.RxBleDevice;
 import com.polidea.rxandroidble.RxBleDeviceServices;
-import com.polidea.rxandroidble.RxBleScanResult;
+import com.polidea.rxandroidble.scan.ScanResult;
 import com.polidea.rxandroidble.exceptions.BleCharacteristicNotFoundException;
 import com.polidea.rxandroidble.internal.RxBleLog;
+import com.polidea.rxandroidble.scan.ScanSettings;
+import com.polidea.rxandroidble.scan.ScanFilter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -272,12 +275,21 @@ public class BleModule extends ReactContextBaseJavaModule {
         if (rxBleClient == null) {
             throw new IllegalStateException("BleManager not created when tried to start device scan");
         }
+
+        ScanFilter[] scanFilters = getScanFiltersFromUUIDs(uuids);
+
         scanSubscription = rxBleClient
-                .scanBleDevices(uuids)
-                .subscribe(new Action1<RxBleScanResult>() {
+                .scanBleDevices(
+                    new ScanSettings.Builder()
+                        .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                        .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                        .build(),
+                    scanFilters
+                )
+                .subscribe(new Action1<ScanResult>() {
                     @Override
-                    public void call(RxBleScanResult rxBleScanResult) {
-                        sendEvent(Event.ScanEvent, scanConverter.toJSCallback(rxBleScanResult));
+                    public void call(ScanResult scanResult) {
+                        sendEvent(Event.ScanEvent, scanConverter.toJSCallback(scanResult));
                     }
                 }, new Action1<Throwable>() {
                     @Override
@@ -285,6 +297,17 @@ public class BleModule extends ReactContextBaseJavaModule {
                         sendEvent(Event.ScanEvent, errorConverter.toError(throwable).toJSCallback());
                     }
                 });
+    }
+
+    private ScanFilter[] getScanFiltersFromUUIDs(final UUID[] uuids) {
+        ScanFilter[] scanFilters = new ScanFilter[uuids.length];
+
+        for (int i = 0; i < uuids.length; i++) {
+            ParcelUuid parcelUuid = ParcelUuid.fromString(uuids[i].toString());
+            scanFilters[i] = new ScanFilter.Builder().setServiceUuid(parcelUuid).build();
+        }
+
+        return scanFilters;
     }
 
     @ReactMethod
