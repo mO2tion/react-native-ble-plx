@@ -1,116 +1,107 @@
-
 <p align="center">
   <img alt="react-native-ble-plx" src="docs/logo.png" />
 </p>
 
-React Native Bluetooth Low Energy library using [RxBluetoothKit](https://github.com/Polidea/RxBluetoothKit) and [RxAndroidBle](https://github.com/Polidea/RxAndroidBle) as it's backend libraries.
+## About this library
 
-Example apps are available in [Google Play](https://play.google.com/store/apps/details?id=com.polidea.sniffator) and [App Store](https://itunes.apple.com/us/app/sniffator/id1147266354?ls=1&mt=8)!
+This is React Native Bluetooth Low Energy library using [RxBluetoothKit](https://github.com/Polidea/RxBluetoothKit) and [RxAndroidBle](https://github.com/Polidea/RxAndroidBle) under the hood.
 
-[![GooglePlay](docs/googleplay.png)](https://play.google.com/store/apps/details?id=com.polidea.sniffator) [![AppStore](docs/appstore.png)](https://itunes.apple.com/us/app/sniffator/id1147266354?ls=1&mt=8)
+It supports:
 
----
+* [observing device's Bluetooth adapter state](https://github.com/Polidea/react-native-ble-plx/wiki/Bluetooth-Adapter-State)
+* [scanning BLE devices](https://github.com/Polidea/react-native-ble-plx/wiki/Bluetooth-Scanning)
+* [making connections to peripherals](https://github.com/Polidea/react-native-ble-plx/wiki/Device-Connecting)
+* [discovering services/characteristics](https://github.com/Polidea/react-native-ble-plx/wiki/Device-Service-Discovery)
+* [reading](https://github.com/Polidea/react-native-ble-plx/wiki/Characteristic-Reading)/[writing](https://github.com/Polidea/react-native-ble-plx/wiki/Characteristic-Writing) characteristics
+* [observing characteristic notifications/indications](https://github.com/Polidea/react-native-ble-plx/wiki/Characteristic-Notifying)
+* [reading RSSI](https://github.com/Polidea/react-native-ble-plx/wiki/RSSI-Reading)
+* [negotiating MTU](https://github.com/Polidea/react-native-ble-plx/wiki/MTU-Negotiation)
 
-[![NPM](https://nodei.co/npm/react-native-ble-plx.png?downloads=true)](https://nodei.co/npm/react-native-ble-plx/)
+What this library does NOT support:
 
----
+* turning the device's Bluetooth adapter on
+* communicating between phones using BLE (Peripheral support)
+* [bonding peripherals](https://github.com/Polidea/react-native-ble-plx/wiki/Device-Bonding)
 
 ## Recent Changes
 
-**0.8.0**
-- Fix regression of Base64 encoding on Android platform. When large chunk of Base64 data was sent from Android it contained new lines characters.
-- Updated RxAndroidBle to version 1.4.3.
-- Fixed colissions in Characteristic and Service id generation on Android. The collisions had place if multiple devices with the same characteristic/service UUIDs were connected at the same time.
-- Fixed dropped notifications right after setup on Android. Before there was small window when notification was monitored and listener for it wasn't mounted.
-- Minor documentation updates.
-  
+**0.10.0**
+
+**Breaking changes:**
+
+* Deprecate old build system. Carthage is not required anymore. To fix your current project please do following steps:
+
+  1. Add empty Swift file if you don't have at least one:
+     * Select File/New/File...
+     * Choose Swift file and click Next.
+     * Name it however you want, select your targets and create it.
+     * Accept to create Objective-C bridging header.
+  2. Remove copy-frameworks script if you don't have any other dependency requiring it:
+     * Go to Your Target / Build Phases
+     * Remove run script.
+
+Other:
+
+* Fix warning when no listeners were attached and events were emitted.
+* Show error.message properly. Make sure that invalid errorCodes from implementation side won't trigger another error during construction.
+* Property ServiceUUID is properly propagated to IncludedServicesDiscoveryFailed's error message.
+* Add missing `deviceServicesNotDiscovered` implementation on Android.
+
 [All previous changes](CHANGELOG.md)
 
 ## Documentation & Support
 
-Documentation can be found [here](https://polidea.github.io/react-native-ble-plx/).
+Interested in React Native project involving Bluetooth Low Energy? [We can help you!](https://www.polidea.com/react-native)
 
+Documentation can be found [here](https://polidea.github.io/react-native-ble-plx/).
 
 Contact us at [Gitter](https://gitter.im/RxBLELibraries/react-native-ble) if you have any questions, feedback or want to help!
 
 ## Configuration & Installation
 
-### Important
-If you do not have [Carthage](https://github.com/Carthage/Carthage) installed yet and 
-wish to set up for iOS, please install it first and only then follow the steps given below
+### iOS (pure react-native)
 
-### Automatically
+1. `npm install --save react-native-ble-plx`
+2. `react-native link react-native-ble-plx`
+3. Add empty Swift file if you don't have at least one:
+   * Select File/New/File...
+   * Choose Swift file and click Next.
+   * Name it however you want, select your targets and create it.
+   * Accept to create Objective-C bridging header.
+4. Minimal supported version of iOS is 8.0
+5. If you want to support background mode:
+   * In your application target go to `Capabilities` tab and enable `Uses Bluetooth LE Accessories` in
+     `Background Modes` section.
+   * Pass `restoreStateIdentifier` and `restoreStateFunction` to `BleManager` constructor.
 
-```bash
-npm install --save react-native-ble-plx
-react-native link react-native-ble-plx
-```
+### iOS (expo/Podfile)
 
-Both on iOS and Android continue manually from step 7.
+1. Make sure your Expo project is detached. You can read how to do it [here](https://docs.expo.io/versions/latest/expokit/detach) and [here](https://docs.expo.io/versions/latest/expokit/expokit).
+2. `npm install --save react-native-ble-plx`
+3. `react-native link react-native-ble-plx`
+4. Add empty Swift file if you don't have at least one:
+   * Select File/New/File...
+   * Choose Swift file and click Next.
+   * Name it however you want, select your application target and create it.
+   * Accept to create Objective-C bridging header.
+5. Update your `ios/Podfile` to contain:
+   ```
+   pod 'react-native-ble-plx', :path => '../node_modules/react-native-ble-plx'
+   pod 'react-native-ble-plx-swift', :path => '../node_modules/react-native-ble-plx'
+   ```
+6. Enter `ios` folder and run `pod update`
+7. Minimal supported version of iOS is 8.0
+8. If you want to support background mode:
+   * In your application target go to `Capabilities` tab and enable `Uses Bluetooth LE Accessories` in
+     `Background Modes` section.
+   * Pass `restoreStateIdentifier` and `restoreStateFunction` to `BleManager` constructor.
 
-### Manually
+### Android
 
-#### iOS
+1. `npm install --save react-native-ble-plx`
+2. `react-native link react-native-ble-plx`
+3. In `build.gradle` of `app` module make sure that min SDK version is at least 18:
 
-1) Add `react-native-ble-plx` to a project as a dependency in `package.json` file.
-  For example `"react-native-ble-plx": "Polidea/react-native-ble-plx"` will install
-  latest version from Polidea's Github repository.
-2) Make sure that you have [Carthage](https://github.com/Carthage/Carthage) installed on your system.
-3) Execute `npm install` to fetch and install a library.
-4) Open iOS project located in `./ios` folder.
-5) Move `BleClient.xcodeproj` located in `.node_modules/react-native-ble-plx/ios`
-  using drag & drop to `Libraries` folder in your project.
-6) In general settings of a target add `libBleClient.a` to Linked Frameworks and Libraries.
-7) In `Build Settings`/`Search Paths`/`Framework search paths` add path: `$(SRCROOT)/../node_modules/react-native-ble-plx/ios/BleClientManager/Carthage/Build/iOS`.  
-8) In `Build Settings`/`Build Options`/`Always Embed Swift Standard Libraries` set to `Yes`.
-9) In `Build Phases` click on top left button and add `New Run Script Phase`. 
-  * Shell command: `/usr/local/bin/carthage copy-frameworks`
-  * Input Files:
-    * `$(SRCROOT)/../node_modules/react-native-ble-plx/ios/BleClientManager/Carthage/Build/iOS/BleClientManager.framework`
-    * `$(SRCROOT)/../node_modules/react-native-ble-plx/ios/BleClientManager/Carthage/Build/iOS/RxSwift.framework`
-    * `$(SRCROOT)/../node_modules/react-native-ble-plx/ios/BleClientManager/Carthage/Build/iOS/RxBluetoothKit.framework`
-10) Minimal supported version of iOS is 8.0
-11) If you want to support background mode:
-    * In your application target go to `Capabilities` tab and enable `Uses Bluetooth LE Accessories` in 
-      `Background Modes` section.
-    * Pass `restoreStateIdentifier` and `restoreStateFunction` to `BleManager` constructor.
-
-#### Android
-
-1) Add `react-native-ble-plx` to a project as a dependency in `package.json` file.
-  For example `"react-native-ble-plx": "Polidea/react-native-ble-plx"` will install
-  latest version from Polidea's Github repository.
-2) Execute `npm install` to fetch and install a library.
-3) Open Android project located in `./android` folder.
-4) In `settings.gradle` add following lines:
-```groovy
-include ':react-native-ble-plx'
-project(':react-native-ble-plx').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-ble-plx/android')
-```
-5) In `MainApplication.getPackages` import and add BleModule package:
-```java
-import com.polidea.reactnativeble.BlePackage;
-...
-
-public class MainApplication extends Application implements ReactApplication {
-    ...
-
-    @Override
-    protected List<ReactPackage> getPackages() {
-      return Arrays.<ReactPackage>asList(
-        new MainReactPackage(),
-        new BlePackage()
-      );
-}
-```
-6) In `build.gradle` of `app` module add following dependency:
-```groovy
-dependencies {
-   ...
-   compile project(':react-native-ble-plx')
-   ...
-```
-7) Additionaly make sure that min SDK version is at least 18:
 ```groovy
 android {
     ...
@@ -119,8 +110,7 @@ android {
         ...
 ```
 
-
-8) In `AndroidManifest.xml`, add Bluetooth permissions and update `<uses-sdk/>`:
+4. In `AndroidManifest.xml`, add Bluetooth permissions and update `<uses-sdk/>`:
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -130,7 +120,7 @@ android {
     <uses-permission-sdk-23 android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <!-- Add this line if your application always requires BLE. More info can be found on:
-         https://developer.android.com/guide/topics/connectivity/bluetooth-le.html#permissions 
+         https://developer.android.com/guide/topics/connectivity/bluetooth-le.html#permissions
       -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
 

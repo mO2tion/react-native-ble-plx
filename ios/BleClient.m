@@ -7,20 +7,38 @@
 //
 
 #import "BleClient.h"
-@import BleClientManager;
+
+#ifdef REACT_NATIVE_BLE_PLX_SWIFT
+@import react_native_ble_plx_swift;
+#else
+#import "BleClient-Swift.h"
+#endif
 
 @interface BleModule () <BleClientManagerDelegate>
 @property(nonatomic) BleClientManager* manager;
 @end
 
 @implementation BleModule
+{
+    bool hasListeners;
+}
 
 @synthesize methodQueue = _methodQueue;
 
 RCT_EXPORT_MODULE(BleClientManager);
 
 - (void)dispatchEvent:(NSString * _Nonnull)name value:(id _Nonnull)value {
-    [self sendEventWithName:name body:value];
+    if (hasListeners) {
+        [self sendEventWithName:name body:value];
+    }
+}
+
+- (void)startObserving {
+    hasListeners = YES;
+}
+
+- (void)stopObserving {
+    hasListeners = NO;
 }
 
 - (NSArray<NSString *> *)supportedEvents {
@@ -33,6 +51,10 @@ RCT_EXPORT_MODULE(BleClientManager);
         [consts setValue:event forKey:event];
     }
     return consts;
+}
+
++ (BOOL)requiresMainQueueSetup {
+    return YES;
 }
 
 RCT_EXPORT_METHOD(createClient:(NSString*)restoreIdentifierKey) {
@@ -80,7 +102,7 @@ RCT_EXPORT_METHOD(readRSSIForDevice:(NSString*)deviceIdentifier
 }
 
 RCT_EXPORT_METHOD(requestMTUForDevice:(NSString*)deviceIdentifier
-                                  mtu:(nonnull NSNumber*)mtu
+                                  mtu:(NSInteger)mtu
                         transactionId:(NSString*)transactionId
                              resolver:(RCTPromiseResolveBlock)resolve
                              rejecter:(RCTPromiseRejectBlock)reject) {
@@ -89,6 +111,24 @@ RCT_EXPORT_METHOD(requestMTUForDevice:(NSString*)deviceIdentifier
                     transactionId:transactionId
                           resolve:resolve
                            reject:reject];
+}
+
+// Mark: Device management ---------------------------------------------------------------------------------------------
+
+RCT_EXPORT_METHOD(devices:(NSArray<NSString*>*)deviceIdentifiers
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject) {
+    [_manager devices:deviceIdentifiers
+              resolve:resolve
+               reject:reject];
+}
+
+RCT_EXPORT_METHOD(connectedDevices:(NSArray<NSString*>*)serviceUUIDs
+                          resolver:(RCTPromiseResolveBlock)resolve
+                          rejecter:(RCTPromiseRejectBlock)reject) {
+    [_manager connectedDevices:serviceUUIDs
+                       resolve:resolve
+                        reject:reject];
 }
 
 // Mark: Connection management -----------------------------------------------------------------------------------------

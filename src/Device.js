@@ -2,6 +2,7 @@
 'use strict'
 
 import { BleManager } from './BleManager'
+import { BleError } from './BleError'
 import { Characteristic } from './Characteristic'
 import { Service } from './Service'
 import type { NativeDevice } from './BleModule'
@@ -143,11 +144,11 @@ export class Device implements NativeDevice {
   /**
    * {@link #blemanagerondevicedisconnected|bleManager.onDeviceDisconnected()} with partially filled arguments.
    *
-   * @param {function(error: ?Error, device: Device)} listener callback returning error as a reason of disconnection
-   *                                                           if available and {@link Device} object.
+   * @param {function(error: ?BleError, device: Device)} listener callback returning error as a reason of disconnection
+   *                                                              if available and {@link Device} object.
    * @returns {Subscription} Subscription on which `remove()` function can be called to unsubscribe.
    */
-  onDisconnected(listener: (error: ?Error, device: Device) => void): Subscription {
+  onDisconnected(listener: (error: ?BleError, device: Device) => void): Subscription {
     return this._manager.onDeviceDisconnected(this.id, listener)
   }
 
@@ -257,7 +258,7 @@ export class Device implements NativeDevice {
    *
    * @param {UUID} serviceUUID {@link Service} UUID.
    * @param {UUID} characteristicUUID {@link Characteristic} UUID.
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener - callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener - callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @param {?TransactionId} transactionId optional `transactionId` which can be used in
    * {@link #blemanagercanceltransaction|bleManager.cancelTransaction()} function.
@@ -266,7 +267,7 @@ export class Device implements NativeDevice {
   monitorCharacteristicForService(
     serviceUUID: UUID,
     characteristicUUID: UUID,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void,
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void,
     transactionId: ?TransactionId
   ): Subscription {
     return this._manager.monitorCharacteristicForDevice(

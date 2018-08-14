@@ -2,6 +2,7 @@
 'use strict'
 
 import { BleManager } from './BleManager'
+import { BleError } from './BleError'
 import { Characteristic } from './Characteristic'
 import type { NativeService } from './BleModule'
 import type { DeviceId, Identifier, Base64, UUID, Subscription, TransactionId } from './TypeDefinition'
@@ -117,7 +118,7 @@ export class Service implements NativeService {
    * {@link #blemanagermonitorcharacteristicfordevice|bleManager.monitorCharacteristicForDevice()} with partially filled arguments.
    *
    * @param {UUID} characteristicUUID - {@link Characteristic} UUID.
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @param {?TransactionId} transactionId optional `transactionId` which can be used in
    * {@link #blemanagercanceltransaction|bleManager.cancelTransaction()} function.
@@ -125,7 +126,7 @@ export class Service implements NativeService {
    */
   monitorCharacteristic(
     characteristicUUID: UUID,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void,
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void,
     transactionId: ?TransactionId
   ): Subscription {
     return this._manager._monitorCharacteristicForService(this.id, characteristicUUID, listener, transactionId)

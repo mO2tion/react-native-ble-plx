@@ -206,6 +206,7 @@ export interface NativeBleRestoredState {
  */
 export interface BleModuleInterface {
   // NativeModule methods
+
   addListener(string): void;
   removeListeners(number): void;
 
@@ -276,6 +277,21 @@ export interface BleModuleInterface {
    * @private
    */
   requestMTUForDevice(deviceIdentifier: DeviceId, mtu: number, transactionId: TransactionId): Promise<NativeDevice>;
+
+  // Device management
+
+  /**
+   * Returns a list of known peripherals by their identifiers.
+   * @param {Array<DeviceId>} deviceIdentifiers List of device identifiers
+   */
+  devices(deviceIdentifiers: Array<DeviceId>): Promise<Array<NativeDevice>>;
+
+  /**
+   * Returns a list of the peripherals (containing any of the specified services) currently connected to the system
+   * which have discovered services. Returned devices **may not be connected** to your application.
+   * @param {Array<UUID>} serviceUUIDs List of service UUIDs. Device must contain at least one of them to be listed.
+   */
+  connectedDevices(serviceUUIDs: Array<UUID>): Promise<Array<NativeDevice>>;
 
   // Connection management
 

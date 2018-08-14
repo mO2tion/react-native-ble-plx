@@ -6,6 +6,14 @@ import { Service } from './Service'
 import { Characteristic } from './Characteristic'
 import { State, LogLevel } from './TypeDefinition'
 import { BleModule, EventEmitter } from './BleModule'
+import {
+  parseBleError,
+  BleError,
+  BleErrorCode,
+  BleATTErrorCode,
+  BleAndroidErrorCode,
+  BleIOSErrorCode
+} from './BleError'
 import type { NativeDevice, NativeCharacteristic, NativeBleRestoredState } from './BleModule'
 import type {
   Subscription,
@@ -41,7 +49,7 @@ export class BleManager {
   // Unique identifier used to create internal transactionIds
   _uniqueId: number
   // Map of active promises with functions to forcibly cancel them
-  _activePromises: { [id: string]: (error: Error) => void }
+  _activePromises: { [id: string]: (error: BleError) => void }
   // Map of active subscriptions
   _activeSubscriptions: { [id: string]: Subscription }
 
@@ -80,8 +88,15 @@ export class BleManager {
    * @private
    */
   _destroyPromises() {
+    const destroyedError = new BleError({
+      errorCode: BleErrorCode.BluetoothManagerDestroyed,
+      attErrorCode: (null: ?$Values<typeof BleATTErrorCode>),
+      iosErrorCode: (null: ?$Values<typeof BleIOSErrorCode>),
+      androidErrorCode: (null: ?$Values<typeof BleAndroidErrorCode>),
+      reason: (null: ?string)
+    })
     for (const id in this._activePromises) {
-      this._activePromises[id](new Error('Destroyed'))
+      this._activePromises[id](destroyedError)
     }
   }
 
@@ -97,7 +112,8 @@ export class BleManager {
 
   /**
    * Destroys {@link BleManager} instance. A new instance needs to be created to continue working with
-   * this library.
+   * this library. All operations which were in progress completes with
+   * {@link #bleerrorcodebluetoothmanagerdestroyed|BluetoothManagerDestroyed} error code.
    */
   destroy() {
     // Destroy native module object
@@ -143,7 +159,7 @@ export class BleManager {
       return value
     } catch (error) {
       delete this._activePromises[id]
-      throw error
+      throw parseBleError(error.message)
     }
   }
 
@@ -170,8 +186,9 @@ export class BleManager {
    *
    * Few operations such as monitoring characteristic's value changes can be cancelled by a user. Basically every API
    * entry which accepts `transactionId` allows to call `cancelTransaction` function. When cancelled operation is a
-   * promise or a callback which registers errors, `"Cancelled"` error will be emitted in that case. Cancelling
-   * transaction which doesn't exist is ignored.
+   * promise or a callback which registers errors, {@link #bleerror|BleError} with error code
+   * {@link #bleerrorcodeoperationcancelled|OperationCancelled} will be emitted in that case. Cancelling transaction
+   * which doesn't exist is ignored.
    *
    * @example
    * const transactionId = 'monitor_battery';
@@ -266,7 +283,7 @@ export class BleManager {
    * @param {?Array<UUID>} UUIDs Array of strings containing {@link UUID}s of {@link Service}s which are registered in
    * scanned {@link Device}. If `null` is passed, all available {@link Device}s will be scanned.
    * @param {?ScanOptions} options Optional configuration for scanning operation.
-   * @param {function(error: ?Error, scannedDevice: ?Device)} listener Function which will be called for every scanned
+   * @param {function(error: ?BleError, scannedDevice: ?Device)} listener Function which will be called for every scanned
    * {@link Device} (devices may be scanned multiple times). It's first argument is potential {@link Error} which is set
    * to non `null` value when scanning failed. You have to start scanning process again if that happens. Second argument
    * is a scanned {@link Device}.
@@ -274,11 +291,11 @@ export class BleManager {
   startDeviceScan(
     UUIDs: ?Array<UUID>,
     options: ?ScanOptions,
-    listener: (error: ?Error, scannedDevice: ?Device) => void
+    listener: (error: ?BleError, scannedDevice: ?Device) => void
   ) {
     this.stopDeviceScan()
-    const scanListener = ([error, nativeDevice]: [?Error, ?NativeDevice]) => {
-      listener(error, nativeDevice ? new Device(nativeDevice, this) : null)
+    const scanListener = ([error, nativeDevice]: [?string, ?NativeDevice]) => {
+      listener(error ? parseBleError(error) : null, nativeDevice ? new Device(nativeDevice, this) : null)
     }
     // $FlowFixMe: Flow cannot deduce EmitterSubscription type.
     this._scanEventSubscription = this._eventEmitter.addListener(BleModule.ScanEvent, scanListener)
@@ -330,6 +347,32 @@ export class BleManager {
   // Mark: Connection management ---------------------------------------------------------------------------------------
 
   /**
+   * Returns a list of known peripherals by their identifiers.
+   * @param {Array<DeviceId>} deviceIdentifiers List of device identifiers.
+   */
+  async devices(deviceIdentifiers: Array<DeviceId>): Promise<Array<Device>> {
+    const nativeDevices = await this._callPromise(BleModule.devices(deviceIdentifiers))
+    return nativeDevices.map((nativeDevice: NativeDevice) => {
+      return new Device(nativeDevice, this)
+    })
+  }
+
+  /**
+   * Returns a list of the peripherals (containing any of the specified services) currently connected to the system
+   * which have discovered services. Returned devices **may not be connected** to your application. Make sure to check
+   * if that's the case with function {@link #blemanagerisdeviceconnected|isDeviceConnected}.
+   * @param {Array<UUID>} serviceUUIDs List of service UUIDs. Device must contain at least one of them to be listed.
+   */
+  async connectedDevices(serviceUUIDs: Array<UUID>): Promise<Array<Device>> {
+    const nativeDevices = await this._callPromise(BleModule.connectedDevices(serviceUUIDs))
+    return nativeDevices.map((nativeDevice: NativeDevice) => {
+      return new Device(nativeDevice, this)
+    })
+  }
+
+  // Mark: Connection management ---------------------------------------------------------------------------------------
+
+  /**
    * Connects to {@link Device} with provided ID.
    *
    * @param {DeviceId} deviceIdentifier {@link Device} identifier.
@@ -356,14 +399,14 @@ export class BleManager {
    * Monitors if {@link Device} was disconnected due to any errors or connection problems.
    *
    * @param {DeviceId} deviceIdentifier {@link Device} identifier to be monitored.
-   * @param {function(error: ?Error, device: Device)} listener - callback returning error as a reason of disconnection
+   * @param {function(error: ?BleError, device: Device)} listener - callback returning error as a reason of disconnection
    * if available and {@link Device} object.
    * @returns {Subscription} Subscription on which `remove()` function can be called to unsubscribe.
    */
-  onDeviceDisconnected(deviceIdentifier: DeviceId, listener: (error: ?Error, device: Device) => void): Subscription {
-    const disconnectionListener = ([error, nativeDevice]: [?Error, NativeDevice]) => {
+  onDeviceDisconnected(deviceIdentifier: DeviceId, listener: (error: ?BleError, device: Device) => void): Subscription {
+    const disconnectionListener = ([error, nativeDevice]: [?string, NativeDevice]) => {
       if (deviceIdentifier !== nativeDevice.id) return
-      listener(error, new Device(nativeDevice, this))
+      listener(error ? parseBleError(error) : null, new Device(nativeDevice, this))
     }
 
     const subscription: Subscription = this._eventEmitter.addListener(
@@ -724,7 +767,7 @@ export class BleManager {
    * @param {DeviceId} deviceIdentifier {@link Device} identifier.
    * @param {UUID} serviceUUID {@link Service} UUID.
    * @param {UUID} characteristicUUID {@link Characteristic} UUID.
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener - callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener - callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @param {?TransactionId} transactionId optional `transactionId` which can be used in
    * {@link #blemanagercanceltransaction|cancelTransaction()} function.
@@ -734,7 +777,7 @@ export class BleManager {
     deviceIdentifier: DeviceId,
     serviceUUID: UUID,
     characteristicUUID: UUID,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void,
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void,
     transactionId: ?TransactionId
   ): Subscription {
     const filledTransactionId = transactionId || this._nextUniqueID()
@@ -751,7 +794,7 @@ export class BleManager {
    *
    * @param {Identifier} serviceIdentifier {@link Service} ID.
    * @param {UUID} characteristicUUID {@link Characteristic} UUID.
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener - callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener - callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @param {?TransactionId} transactionId optional `transactionId` which can be used in
    * {@link #blemanagercanceltransaction|cancelTransaction()} function.
@@ -761,7 +804,7 @@ export class BleManager {
   _monitorCharacteristicForService(
     serviceIdentifier: Identifier,
     characteristicUUID: UUID,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void,
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void,
     transactionId: ?TransactionId
   ): Subscription {
     const filledTransactionId = transactionId || this._nextUniqueID()
@@ -777,7 +820,7 @@ export class BleManager {
    * in favour of indications.
    *
    * @param {Identifier} characteristicIdentifier - {@link Characteristic} ID.
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener - callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener - callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @param {?TransactionId} transactionId optional `transactionId` which can be used in
    * {@link #blemanagercanceltransaction|cancelTransaction()} function.
@@ -786,7 +829,7 @@ export class BleManager {
    */
   _monitorCharacteristic(
     characteristicIdentifier: Identifier,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void,
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void,
     transactionId: ?TransactionId
   ): Subscription {
     const filledTransactionId = transactionId || this._nextUniqueID()
@@ -802,7 +845,7 @@ export class BleManager {
    *
    * @param {Promise<void>} monitorPromise Characteristic monitoring promise
    * @param {TransactionId} transactionId TransactionId of passed promise
-   * @param {function(error: ?Error, characteristic: ?Characteristic)} listener - callback which emits
+   * @param {function(error: ?BleError, characteristic: ?Characteristic)} listener - callback which emits
    * {@link Characteristic} objects with modified value for each notification.
    * @returns {Subscription} Subscription on which `remove()` function can be called to unsubscribe.
    * @private
@@ -810,16 +853,16 @@ export class BleManager {
   _handleMonitorCharacteristic(
     monitorPromise: Promise<void>,
     transactionId: TransactionId,
-    listener: (error: ?Error, characteristic: ?Characteristic) => void
+    listener: (error: ?BleError, characteristic: ?Characteristic) => void
   ): Subscription {
     const monitorListener = ([error, characteristic, msgTransactionId]: [
-      ?Error,
+      ?string,
       NativeCharacteristic,
       TransactionId
     ]) => {
       if (transactionId !== msgTransactionId) return
       if (error) {
-        listener(error, null)
+        listener(parseBleError(error), null)
         return
       }
       listener(null, new Characteristic(characteristic, this))
@@ -842,7 +885,7 @@ export class BleManager {
       () => {
         wrappedSubscription.remove()
       },
-      (error: Error) => {
+      (error: BleError) => {
         listener(error, null)
         wrappedSubscription.remove()
       }
