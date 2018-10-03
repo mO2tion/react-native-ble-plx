@@ -4,12 +4,13 @@
 import { Device } from './Device'
 import { Service } from './Service'
 import { Characteristic } from './Characteristic'
-import { State, LogLevel } from './TypeDefinition'
+import { State, LogLevel, type BleErrorCodeMessageMapping } from './TypeDefinition'
 import { BleModule, EventEmitter } from './BleModule'
 import {
   parseBleError,
   BleError,
   BleErrorCode,
+  BleErrorCodeMessage,
   BleATTErrorCode,
   BleAndroidErrorCode,
   BleIOSErrorCode
@@ -53,6 +54,9 @@ export class BleManager {
   // Map of active subscriptions
   _activeSubscriptions: { [id: string]: Subscription }
 
+  // Map of error codes to error messages
+  _errorCodesToMessagesMapping: BleErrorCodeMessageMapping
+
   /**
    * Creates an instance of {@link BleManager}.
    */
@@ -80,6 +84,10 @@ export class BleManager {
       )
     }
 
+    this._errorCodesToMessagesMapping = options.errorCodesToMessagesMapping
+      ? options.errorCodesToMessagesMapping
+      : BleErrorCodeMessage
+
     BleModule.createClient(options.restoreStateIdentifier || null)
   }
 
@@ -88,13 +96,16 @@ export class BleManager {
    * @private
    */
   _destroyPromises() {
-    const destroyedError = new BleError({
-      errorCode: BleErrorCode.BluetoothManagerDestroyed,
-      attErrorCode: (null: ?$Values<typeof BleATTErrorCode>),
-      iosErrorCode: (null: ?$Values<typeof BleIOSErrorCode>),
-      androidErrorCode: (null: ?$Values<typeof BleAndroidErrorCode>),
-      reason: (null: ?string)
-    })
+    const destroyedError = new BleError(
+      {
+        errorCode: BleErrorCode.BluetoothManagerDestroyed,
+        attErrorCode: (null: ?$Values<typeof BleATTErrorCode>),
+        iosErrorCode: (null: ?$Values<typeof BleIOSErrorCode>),
+        androidErrorCode: (null: ?$Values<typeof BleAndroidErrorCode>),
+        reason: (null: ?string)
+      },
+      this._errorCodesToMessagesMapping
+    )
     for (const id in this._activePromises) {
       this._activePromises[id](destroyedError)
     }
@@ -159,7 +170,7 @@ export class BleManager {
       return value
     } catch (error) {
       delete this._activePromises[id]
-      throw parseBleError(error.message)
+      throw parseBleError(error.message, this._errorCodesToMessagesMapping)
     }
   }
 
@@ -295,7 +306,10 @@ export class BleManager {
   ) {
     this.stopDeviceScan()
     const scanListener = ([error, nativeDevice]: [?string, ?NativeDevice]) => {
-      listener(error ? parseBleError(error) : null, nativeDevice ? new Device(nativeDevice, this) : null)
+      listener(
+        error ? parseBleError(error, this._errorCodesToMessagesMapping) : null,
+        nativeDevice ? new Device(nativeDevice, this) : null
+      )
     }
     // $FlowFixMe: Flow cannot deduce EmitterSubscription type.
     this._scanEventSubscription = this._eventEmitter.addListener(BleModule.ScanEvent, scanListener)
@@ -406,7 +420,7 @@ export class BleManager {
   onDeviceDisconnected(deviceIdentifier: DeviceId, listener: (error: ?BleError, device: Device) => void): Subscription {
     const disconnectionListener = ([error, nativeDevice]: [?string, NativeDevice]) => {
       if (deviceIdentifier !== nativeDevice.id) return
-      listener(error ? parseBleError(error) : null, new Device(nativeDevice, this))
+      listener(error ? parseBleError(error, this._errorCodesToMessagesMapping) : null, new Device(nativeDevice, this))
     }
 
     const subscription: Subscription = this._eventEmitter.addListener(
@@ -862,7 +876,7 @@ export class BleManager {
     ]) => {
       if (transactionId !== msgTransactionId) return
       if (error) {
-        listener(parseBleError(error), null)
+        listener(parseBleError(error, this._errorCodesToMessagesMapping), null)
         return
       }
       listener(null, new Characteristic(characteristic, this))
