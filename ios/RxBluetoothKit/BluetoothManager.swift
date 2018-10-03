@@ -125,7 +125,7 @@ public class BluetoothManager {
                     // filtered properly
                     return elem.observable.filter { scannedPeripheral in
                         if let services = scannedPeripheral.advertisementData.serviceUUIDs {
-                            return Set(services).isSuperset(of: Set(serviceUUIDs))
+                            return Set(serviceUUIDs).isSuperset(of: Set(services))
                         }
                         return false
                     }
